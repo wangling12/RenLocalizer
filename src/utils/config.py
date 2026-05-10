@@ -19,6 +19,7 @@ from src.utils.constants import (
     AI_DEFAULT_TEMPERATURE, AI_DEFAULT_TIMEOUT, AI_DEFAULT_MAX_TOKENS,
     AI_MAX_RETRIES, MAX_CHARS_PER_REQUEST, WINDOW_DEFAULT_WIDTH
 )
+from src.utils.language_registry import LanguageRegistry, DEFAULT_LANGUAGE
 
 class Language(Enum):
     """Supported UI languages."""
@@ -741,28 +742,9 @@ class ConfigManager:
 
         Accepts legacy API codes (e.g. tr, es, zh-CN) and returns the
         Ren'Py language key used for tl/<lang>/ directories.
+        Delegates to LanguageRegistry for unified mapping.
         """
-        value = str(code or "").strip()
-        if not value:
-            return "turkish"
-
-        lowered = value.lower()
-        renpy_codes = {item['renpy'].lower(): item['renpy'] for item in self.get_all_languages()}
-        if lowered in renpy_codes:
-            return renpy_codes[lowered]
-
-        api_to_renpy = self.get_api_to_renpy_map()
-        if lowered in api_to_renpy:
-            return api_to_renpy[lowered]
-
-        # Legacy naming fallback
-        legacy_map = {
-            "tr": "turkish",
-            "zh-cn": "chinese_s",
-            "zh_tw": "chinese_t",
-            "zh-tw": "chinese_t",
-        }
-        return legacy_map.get(lowered, value)
+        return LanguageRegistry.get_instance().normalize(code)
 
     def save_glossary(self) -> bool:
         """Save glossary to file."""
@@ -846,106 +828,10 @@ class ConfigManager:
     
     def get_all_languages(self) -> list:
         """
-        Central language list - single source of truth.
-        Returns list of dicts with 'renpy', 'api', 'english', and 'native' keys.
+        Get all supported languages.
+        Delegates to LanguageRegistry as the single source of truth.
         """
-        return [
-            {"renpy": "turkish", "api": "tr", "english": "Turkish", "native": "Türkçe"},
-            {"renpy": "english", "api": "en", "english": "English", "native": "English"},
-            {"renpy": "german", "api": "de", "english": "German", "native": "Deutsch"},
-            {"renpy": "french", "api": "fr", "english": "French", "native": "Français"},
-            {"renpy": "spanish", "api": "es", "english": "Spanish", "native": "Español"},
-            {"renpy": "italian", "api": "it", "english": "Italian", "native": "Italiano"},
-            {"renpy": "portuguese", "api": "pt", "english": "Portuguese", "native": "Português"},
-            {"renpy": "russian", "api": "ru", "english": "Russian", "native": "Русский"},
-            {"renpy": "polish", "api": "pl", "english": "Polish", "native": "Polski"},
-            {"renpy": "dutch", "api": "nl", "english": "Dutch", "native": "Nederlands"},
-            {"renpy": "japanese", "api": "ja", "english": "Japanese", "native": "日本語"},
-            {"renpy": "korean", "api": "ko", "english": "Korean", "native": "한국어"},
-            {"renpy": "chinese_s", "api": "zh-CN", "english": "Chinese (Simplified)", "native": "简体中文"},
-            {"renpy": "chinese_t", "api": "zh-TW", "english": "Chinese (Traditional)", "native": "繁體中文"},
-            {"renpy": "arabic", "api": "ar", "english": "Arabic", "native": "العربية"},
-            {"renpy": "thai", "api": "th", "english": "Thai", "native": "ไทย"},
-            {"renpy": "vietnamese", "api": "vi", "english": "Vietnamese", "native": "Tiếng Việt"},
-            {"renpy": "indonesian", "api": "id", "english": "Indonesian", "native": "Bahasa Indonesia"},
-            {"renpy": "malay", "api": "ms", "english": "Malay", "native": "Bahasa Melayu"},
-            {"renpy": "hindi", "api": "hi", "english": "Hindi", "native": "हिन्दी"},
-            {"renpy": "persian", "api": "fa", "english": "Persian (Farsi)", "native": "فارsi"},
-            {"renpy": "czech", "api": "cs", "english": "Czech", "native": "Čeština"},
-            {"renpy": "danish", "api": "da", "english": "Danish", "native": "Dansk"},
-            {"renpy": "finnish", "api": "fi", "english": "Finnish", "native": "Suomi"},
-            {"renpy": "greek", "api": "el", "english": "Greek", "native": "Ελληνικά"},
-            {"renpy": "hebrew", "api": "he", "english": "Hebrew", "native": "עברית"},
-            {"renpy": "hungarian", "api": "hu", "english": "Hungarian", "native": "Magyar"},
-            {"renpy": "norwegian", "api": "no", "english": "Norwegian", "native": "Norsk"},
-            {"renpy": "romanian", "api": "ro", "english": "Romanian", "native": "Română"},
-            {"renpy": "swedish", "api": "sv", "english": "Swedish", "native": "Svenska"},
-            {"renpy": "ukrainian", "api": "uk", "english": "Ukrainian", "native": "Українська"},
-            {"renpy": "bulgarian", "api": "bg", "english": "Bulgarian", "native": "Български"},
-            {"renpy": "catalan", "api": "ca", "english": "Catalan", "native": "Català"},
-            {"renpy": "croatian", "api": "hr", "english": "Croatian", "native": "Hrvatski"},
-            {"renpy": "slovak", "api": "sk", "english": "Slovak", "native": "Slovenčina"},
-            {"renpy": "slovenian", "api": "sl", "english": "Slovenian", "native": "Slovenščina"},
-            {"renpy": "serbian", "api": "sr", "english": "Serbian", "native": "Српски"},
-            {"renpy": "afrikaans", "api": "af", "english": "Afrikaans", "native": "Afrikaans"},
-            {"renpy": "albanian", "api": "sq", "english": "Albanian", "native": "Shqip"},
-            {"renpy": "amharic", "api": "am", "english": "Amharic", "native": "አማርኛ"},
-            {"renpy": "armenian", "api": "hy", "english": "Armenian", "native": "Հայերեն"},
-            {"renpy": "azerbaijani", "api": "az", "english": "Azerbaijani", "native": "Azərbaycanca"},
-            {"renpy": "basque", "api": "eu", "english": "Basque", "native": "Euskara"},
-            {"renpy": "belarusian", "api": "be", "english": "Belarusian", "native": "Беларуская"},
-            {"renpy": "bengali", "api": "bn", "english": "Bengali", "native": "বাংলা"},
-            {"renpy": "bosnian", "api": "bs", "english": "Bosnian", "native": "Bosanski"},
-            {"renpy": "esperanto", "api": "eo", "english": "Esperanto", "native": "Esperanto"},
-            {"renpy": "estonian", "api": "et", "english": "Estonian", "native": "Eesti"},
-            {"renpy": "filipino", "api": "tl", "english": "Filipino", "native": "Filipino"},
-            {"renpy": "galician", "api": "gl", "english": "Galician", "native": "Galego"},
-            {"renpy": "georgian", "api": "ka", "english": "Georgian", "native": "ქართული"},
-            {"renpy": "gujarati", "api": "gu", "english": "Gujarati", "native": "ગુજરાતી"},
-            {"renpy": "haitian_creole", "api": "ht", "english": "Haitian Creole", "native": "Kreyòl Ayisyen"},
-            {"renpy": "hausa", "api": "ha", "english": "Hausa", "native": "Hausa"},
-            {"renpy": "icelandic", "api": "is", "english": "Icelandic", "native": "Íslenska"},
-            {"renpy": "igbo", "api": "ig", "english": "Igbo", "native": "Asụsụ Igbo"},
-            {"renpy": "irish", "api": "ga", "english": "Irish", "native": "Gaeilge"},
-            {"renpy": "javanese", "api": "jv", "english": "Javanese", "native": "Basa Jawa"},
-            {"renpy": "kannada", "api": "kn", "english": "Kannada", "native": "ಕನ್ನಡ"},
-            {"renpy": "kazakh", "api": "kk", "english": "Kazakh", "native": "Қазақ тілі"},
-            {"renpy": "khmer", "api": "km", "english": "Khmer", "native": "ភាសាខ្មែរ"},
-            {"renpy": "kurdish", "api": "ku", "english": "Kurdish", "native": "Kurdî"},
-            {"renpy": "kyrgyz", "api": "ky", "english": "Kyrgyz", "native": "Кыргызча"},
-            {"renpy": "lao", "api": "lo", "english": "Lao", "native": "ພາສາລາວ"},
-            {"renpy": "latvian", "api": "lv", "english": "Latvian", "native": "Latviešu"},
-            {"renpy": "lithuanian", "api": "lt", "english": "Lithuanian", "native": "Lietuvių"},
-            {"renpy": "luxembourgish", "api": "lb", "english": "Luxembourgish", "native": "Lëtzebuergesch"},
-            {"renpy": "macedonian", "api": "mk", "english": "Macedonian", "native": "Македонски"},
-            {"renpy": "malagasy", "api": "mg", "english": "Malagasy", "native": "Malagasy"},
-            {"renpy": "malayalam", "api": "ml", "english": "Malayalam", "native": "മലയാളം"},
-            {"renpy": "maltese", "api": "mt", "english": "Maltese", "native": "Malti"},
-            {"renpy": "maori", "api": "mi", "english": "Maori", "native": "Māori"},
-            {"renpy": "marathi", "api": "mr", "english": "Marathi", "native": "मराठी"},
-            {"renpy": "mongolian", "api": "mn", "english": "Mongolian", "native": "Монгол"},
-            {"renpy": "myanmar", "api": "my", "english": "Myanmar (Burmese)", "native": "ဗမာ"},
-            {"renpy": "nepali", "api": "ne", "english": "Nepali", "native": "नेपाली"},
-            {"renpy": "pashto", "api": "ps", "english": "Pashto", "native": "پښتو"},
-            {"renpy": "punjabi", "api": "pa", "english": "Punjabi", "native": "ਪੰਜਾਬੀ"},
-            {"renpy": "samoan", "api": "sm", "english": "Samoan", "native": "Gagana Sāmoa"},
-            {"renpy": "scots_gaelic", "api": "gd", "english": "Scots Gaelic", "native": "Gàidhlig"},
-            {"renpy": "shona", "api": "sn", "english": "Shona", "native": "chiShona"},
-            {"renpy": "sindhi", "api": "sd", "english": "Sindhi", "native": "سنڌي"},
-            {"renpy": "sinhala", "api": "si", "english": "Sinhala", "native": "සිංහල"},
-            {"renpy": "somali", "api": "so", "english": "Somali", "native": "Soomaali"},
-            {"renpy": "swahili", "api": "sw", "english": "Swahili", "native": "Kiswahili"},
-            {"renpy": "tajik", "api": "tg", "english": "Tajik", "native": "Тоҷикӣ"},
-            {"renpy": "tamil", "api": "ta", "english": "Tamil", "native": "தமிழ்"},
-            {"renpy": "telugu", "api": "te", "english": "Telugu", "native": "తెలుగు"},
-            {"renpy": "urdu", "api": "ur", "english": "Urdu", "native": "اردو"},
-            {"renpy": "uzbek", "api": "uz", "english": "Uzbek", "native": "Oʻzbekcha"},
-            {"renpy": "welsh", "api": "cy", "english": "Welsh", "native": "Cymraeg"},
-            {"renpy": "xhosa", "api": "xh", "english": "Xhosa", "native": "isiXhosa"},
-            {"renpy": "yiddish", "api": "yi", "english": "Yiddish", "native": "ייִדיש"},
-            {"renpy": "yoruba", "api": "yo", "english": "Yoruba", "native": "Yorùbá"},
-            {"renpy": "zulu", "api": "zu", "english": "Zulu", "native": "isiZulu"},
-        ]
+        return LanguageRegistry.get_instance().get_ui_language_list()
     
     def get_renpy_to_api_map(self) -> Dict[str, str]:
         """Get Ren'Py language code to API code mapping."""

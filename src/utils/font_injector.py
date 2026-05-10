@@ -16,54 +16,17 @@ import shutil
 from pathlib import Path
 from typing import Dict, Optional, Tuple, List, Any
 
+from src.utils.language_registry import LanguageRegistry
+
+
 class FontInjector:
     """
     Downloads and configures compatible fonts for Ren'Py games using Google Fonts.
     """
-    
-    # Mapping: Language Code -> ordered fallback candidates (Font Family, Is RTL?)
-    FONT_CANDIDATES: Dict[str, Tuple[Tuple[str, bool], ...]] = {
-        "fa": (("Vazirmatn", True), ("Noto Sans Arabic", True)),
-        "ar": (("Noto Sans Arabic", True), ("Cairo", True), ("Tajawal", True)),
-        "he": (("Noto Sans Hebrew", True), ("Rubik", True), ("Heebo", True)),
-        "ja": (("Noto Sans JP", False), ("M PLUS 1p", False), ("Kosugi Maru", False)),
-        "zh": (("Noto Sans SC", False),),
-        "zh_tw": (("Noto Sans TC", False),),
-        "ko": (("Noto Sans KR", False), ("Nanum Gothic", False)),
-        "ru": (("Noto Sans", False), ("PT Sans", False), ("Ubuntu", False)),
-        "th": (("Noto Sans Thai", False), ("Sarabun", False), ("Prompt", False)),
-        "tr": (("Noto Sans", False), ("Inter", False), ("Open Sans", False)),
-        "uk": (("Noto Sans", False), ("PT Sans", False), ("Ubuntu", False)),
-        "vi": (("Be Vietnam Pro", False), ("Noto Sans", False), ("Inter", False)),
-    }
-
-    # Mapping: Ren'Py Lang Name -> ISO Code
-    LANG_NAME_TO_CODE: Dict[str, str] = {
-        "turkish": "tr",
-        "russian": "ru",
-        "japanese": "ja",
-        "chinese": "zh",
-        "schinese": "zh",
-        "tchinese": "zh_tw",
-        "korean": "ko",
-        "english": "en",
-        "french": "fr",
-        "german": "de",
-        "spanish": "es",
-        "italian": "it",
-        "portuguese": "pt",
-        "arabic": "ar",
-        "persian": "fa",
-        "hebrew": "he",
-        "thai": "th",
-        "vietnamese": "vi",
-        "ukrainian": "uk",
-        "indonesian": "id",
-        "malay": "ms",
-    }
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.registry = LanguageRegistry.get_instance()
 
     GUI_FONT_FIELDS: Tuple[str, ...] = (
         "text_font",
@@ -105,38 +68,38 @@ class FontInjector:
     def get_font_map_list(self) -> List[Dict[str, str]]:
         """Returns a list of default mapped fonts for UI."""
         result: List[Dict[str, str]] = []
-        for lang, candidates in self.FONT_CANDIDATES.items():
+        font_candidates = self.registry.get_all_font_candidates()
+        for iso_code, candidates in font_candidates.items():
             if not candidates:
                 continue
             primary_font, rtl = candidates[0]
-            result.append({"lang": lang, "font": primary_font, "rtl": rtl})
+            result.append({"lang": iso_code, "font": primary_font, "rtl": rtl})
         return result
 
     def inject_font(self, game_dir: str, lang_code: str, force_font_family: Optional[str] = None) -> Dict[str, Any]:
         """
-        Main entry point. 
+        Main entry point.
         If force_font_family is provided, it skips the language mapping lookup.
         """
         # 1. Resolve Language Code and Font Family
         if force_font_family:
             # Manual Selection Mode
             font_family = force_font_family
-            # Try to guess RTL/Config from lang_code, but user overrides font
-            base_lang = self._normalize_lang_code(lang_code)
-            # Default to LTR unless map says otherwise for this lang
-            is_rtl = self.FONT_CANDIDATES.get(base_lang, (("", False),))[0][1]
+            # Use registry for RTL detection
+            is_rtl = self.registry.is_rtl(lang_code)
         else:
-            # Auto Mode
-            base_lang = self._normalize_lang_code(lang_code)
-            
-            if base_lang not in self.FONT_CANDIDATES:
+            # Auto Mode: normalize to Ren'Py code, then get ISO font code
+            renpy_code = self.registry.normalize(lang_code)
+            iso_font_code = self.registry.to_iso_font(renpy_code)
+            candidates = self.registry.get_font_candidates(iso_font_code)
+
+            if not candidates:
                 return {
                     "success": False,
-                    "message": f"No auto mapping for '{lang_code}' (norm: {base_lang})",
+                    "message": f"No auto mapping for '{lang_code}' (renpy: {renpy_code}, iso: {iso_font_code})",
                     "ui_key": "font_err_no_mapping",
                     "ui_args": {"lang": lang_code}
                 }
-            candidates = self.FONT_CANDIDATES[base_lang]
         
         try:
             # 2. Setup Directories
@@ -227,25 +190,6 @@ class FontInjector:
     def get_available_fonts(self) -> List[str]:
         """Returns list of popular fonts sorted alphabetically."""
         return sorted(self.POPULAR_FONTS)
-
-    def _normalize_lang_code(self, lang_code: str) -> str:
-        """Converts 'turkish' -> 'tr', 'zh-CN' -> 'zh', etc."""
-        lower_code = lang_code.lower().strip()
-        
-        # Check name mapping first (turkish -> tr)
-        if lower_code in self.LANG_NAME_TO_CODE:
-            return self.LANG_NAME_TO_CODE[lower_code]
-            
-        # Standard normalization
-        base = lower_code.split('-')[0]
-        
-        # Special cases
-        if lower_code in ["zh-cn", "zh_cn", "zh-hans", "schinese"]:
-            return "zh"
-        elif lower_code in ["zh-tw", "zh_tw", "zh-hant", "tchinese"]:
-            return "zh_tw"
-            
-        return base
 
     def _download_and_extract_google_font(self, font_family: str, target_dir: Path) -> Tuple[bool, Any]:
         """

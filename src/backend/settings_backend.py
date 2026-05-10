@@ -43,17 +43,21 @@ class SettingsBackend(QObject):
     
     @pyqtSlot(result=list)
     def getAvailableUILanguages(self) -> list:
-        """Get available UI languages."""
+        """Get available UI languages with native display names."""
+        ui_lang_display = {
+            "tr": "🇹🇷 Türkçe",
+            "en": "🇬🇧 English",
+            "de": "🇩🇪 Deutsch",
+            "fr": "🇫🇷 Français",
+            "es": "🇪🇸 Español",
+            "ru": "🇷🇺 Русский",
+            "fa": "🇮🇷 فارسی",
+            "zh-CN": "🇨🇳 中文 (简体)",
+            "ja": "🇯🇵 日本語",
+        }
         return [
-            {"code": "tr", "name": "🇹🇷 Türkçe"},
-            {"code": "en", "name": "🇬🇧 English"},
-            {"code": "de", "name": "🇩🇪 Deutsch"},
-            {"code": "fr", "name": "🇫🇷 Français"},
-            {"code": "es", "name": "🇪🇸 Español"},
-            {"code": "ru", "name": "🇷🇺 Русский"},
-            {"code": "fa", "name": "🇮🇷 فارسی"},
-            {"code": "zh-CN", "name": "🇨🇳 中文 (简体)"},
-            {"code": "ja", "name": "🇯🇵 日本語"},
+            {"code": lang.value, "name": ui_lang_display.get(lang.value, lang.value)}
+            for lang in Language
         ]
     
     @pyqtSlot(result=str)
@@ -138,42 +142,7 @@ class SettingsBackend(QObject):
         self.config.save_config()
     
     # ==================== API KEYS ====================
-    
-    @pyqtSlot(result=str)
-    def getDeepLApiKey(self) -> str:
-        return self.config.api_keys.deepl_api_key or ""
-    
-    @pyqtSlot(str)
-    def setDeepLApiKey(self, key: str):
-        self.config.api_keys.deepl_api_key = key.strip()
-        self.config.save_config()
-
-    @pyqtSlot(result=str)
-    def getDeepLFormality(self) -> str:
-        return getattr(self.config.translation_settings, 'deepl_formality', 'default')
-
-    @pyqtSlot(str)
-    def setDeepLFormality(self, value: str):
-        self.config.translation_settings.deepl_formality = value
-        self.config.save_config()
-    
-    @pyqtSlot(result=str)
-    def getOpenAIApiKey(self) -> str:
-        return self.config.api_keys.openai_api_key or ""
-    
-    @pyqtSlot(str)
-    def setOpenAIApiKey(self, key: str):
-        self.config.api_keys.openai_api_key = key.strip()
-        self.config.save_config()
-    
-    @pyqtSlot(result=str)
-    def getGeminiApiKey(self) -> str:
-        return self.config.api_keys.gemini_api_key or ""
-    
-    @pyqtSlot(str)
-    def setGeminiApiKey(self, key: str):
-        self.config.api_keys.gemini_api_key = key.strip()
-        self.config.save_config()
+    # (DeepL/OpenAI/Gemini key methods defined later in DEEPL SETTINGS section)
 
     @pyqtSlot(result=str)
     def getDeepSeekApiKey(self) -> str:
@@ -345,34 +314,8 @@ class SettingsBackend(QObject):
         self.config.save_config()
     
     # ==================== AI SETTINGS ====================
-    
-    @pyqtSlot(result=str)
-    def getOpenAIModel(self) -> str:
-        return self.config.translation_settings.openai_model or "gpt-3.5-turbo"
-    
-    @pyqtSlot(str)
-    def setOpenAIModel(self, model: str):
-        self.config.translation_settings.openai_model = model
-        self.config.save_config()
-    
-    @pyqtSlot(result=str)
-    def getOpenAIBaseUrl(self) -> str:
-        return self.config.translation_settings.openai_base_url or ""
-    
-    @pyqtSlot(str)
-    def setOpenAIBaseUrl(self, url: str):
-        self.config.translation_settings.openai_base_url = url.strip()
-        self.config.save_config()
-    
-    @pyqtSlot(result=str)
-    def getGeminiModel(self) -> str:
-        return self.config.translation_settings.gemini_model or "gemini-2.5-flash"
-    
-    @pyqtSlot(str)
-    def setGeminiModel(self, model: str):
-        self.config.translation_settings.gemini_model = model.strip()
-        self.config.save_config()
-    
+    # (OpenAI/Gemini model methods defined later in AI API KEYS & MODELS section)
+
     @pyqtSlot(result=str)
     def getGeminiSafety(self) -> str:
         return self.config.translation_settings.gemini_safety_settings or "BLOCK_MEDIUM_AND_ABOVE"

@@ -192,5 +192,5 @@ class TestLanguageNormalization(unittest.TestCase):
         cm = ConfigManager.__new__(ConfigManager)
         self.assertEqual(cm.normalize_renpy_language_code('tr'), 'turkish')
         self.assertEqual(cm.normalize_renpy_language_code('es'), 'spanish')
-        self.assertEqual(cm.normalize_renpy_language_code('zh-CN'), 'chinese_s')
+        self.assertEqual(cm.normalize_renpy_language_code('zh-CN'), 'schinese')
         self.assertEqual(cm.normalize_renpy_language_code('turkish'), 'turkish')

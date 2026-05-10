@@ -44,28 +44,18 @@ from src.core.diagnostics import DiagnosticReport
 from src.core.runtime_coverage import load_runtime_miss_log, score_runtime_miss_entries, summarize_runtime_miss_scores
 
 
-# Ren'Py dil kodları -> API dil kodları dönüşümü
-# Merkezi config'den dinamik olarak oluşturulur
+# Ren'Py language codes -> API language codes mapping
+# Uses LanguageRegistry as the single source of truth
 def _get_renpy_to_api_lang():
-    """Get Ren'Py to API language mapping from centralized config."""
+    """Get Ren'Py to API language mapping from LanguageRegistry."""
     try:
         from src.utils.config import ConfigManager
         config = ConfigManager()
         return config.get_renpy_to_api_map()
     except Exception:
-        # Fallback for edge cases where config is not available
-        return {
-            "turkish": "tr", "english": "en", "german": "de", "french": "fr",
-            "spanish": "es", "italian": "it", "portuguese": "pt", "russian": "ru",
-            "polish": "pl", "dutch": "nl", "japanese": "ja", "korean": "ko",
-            "chinese": "zh", "chinese_s": "zh-CN", "chinese_t": "zh-TW",
-            "thai": "th", "vietnamese": "vi", "indonesian": "id", "malay": "ms",
-            "hindi": "hi", "persian": "fa", "arabic": "ar", "czech": "cs",
-            "danish": "da", "finnish": "fi", "greek": "el", "hebrew": "he",
-            "hungarian": "hu", "norwegian": "no", "romanian": "ro", "swedish": "sv",
-            "ukrainian": "uk", "bulgarian": "bg", "catalan": "ca", "croatian": "hr",
-            "slovak": "sk", "slovenian": "sl", "serbian": "sr",
-        }
+        # Fallback to LanguageRegistry when config is unavailable
+        from src.utils.language_registry import LanguageRegistry
+        return LanguageRegistry.get_instance().get_renpy_to_api_map()
 
 class _LazyRenpyToApiLangMap:
     def __init__(self):
