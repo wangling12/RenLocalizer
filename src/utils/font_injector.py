@@ -65,6 +65,44 @@ class FontInjector:
         "notify_text",
     )
 
+    # Popular Google Fonts List for Manual Selection
+    POPULAR_FONTS = [
+        "Roboto", "Open Sans", "Lato", "Montserrat", "Oswald", "Source Sans Pro", 
+        "Slabo 27px", "Raleway", "PT Sans", "Merriweather", "Noto Sans", "Noto Serif",
+        "Nunito", "Playfair Display", "Rubik", "Ubuntu", "Poppins", "Kanit", "Inter",
+        "Quicksand", "Work Sans", "Fira Sans", "Barlow", "Mulish", "Inconsolata",
+        "IBM Plex Sans", "Titillium Web", "DM Sans", "Oxygen", "Arimo", "Assistant",
+        "Josefin Sans", "Libre Baskerville", "Anton", "Cairo", "Hind", "Bitter",
+        "Vazirmatn", "Noto Sans Arabic", "Noto Sans JP", "Noto Sans SC", "Noto Sans KR",
+        "Amiri", "Tajawal", "Almarai", "Harmattan", "Lalezar"
+    ]
+
+    # Known CJK font prefixes for subset selection
+    _CJK_FONT_PREFIXES = {
+        "noto-sans-sc", "noto-serif-sc",
+        "noto-sans-tc", "noto-serif-tc",
+        "noto-sans-jp", "noto-serif-jp",
+        "noto-sans-kr", "noto-serif-kr",
+    }
+
+    def _get_font_subsets(self, font_id: str) -> str:
+        """
+        Returns appropriate font subsets based on font family.
+        Ensures CJK fonts include their respective character sets.
+        Uses prefix matching to avoid false positives from substring checks.
+        """
+        for prefix in self._CJK_FONT_PREFIXES:
+            if font_id.startswith(prefix):
+                if "-sc" in prefix:
+                    return "latin,latin-ext,cyrillic,cyrillic-ext,chinese-simplified"
+                if "-tc" in prefix:
+                    return "latin,latin-ext,cyrillic,cyrillic-ext,chinese-traditional"
+                if "-jp" in prefix:
+                    return "latin,latin-ext,cyrillic,cyrillic-ext,japanese"
+                if "-kr" in prefix:
+                    return "latin,latin-ext,cyrillic,cyrillic-ext,korean"
+        return "latin,latin-ext,cyrillic,cyrillic-ext,greek,greek-ext,vietnamese"
+
     def get_font_map_list(self) -> List[Dict[str, str]]:
         """Returns a list of default mapped fonts for UI."""
         result: List[Dict[str, str]] = []
@@ -147,6 +185,9 @@ class FontInjector:
             rpy_path = game_path / "zzz_renlocalizer_font.rpy"
             renpy_font_path = f"tl/renlocalizer_fonts/{font_filename}"
             
+            self.logger.info(f"Creating font script at: {rpy_path}")
+            self.logger.info(f"Font path: {renpy_font_path}, RTL: {is_rtl}, Lang: {lang_code}")
+            
             already_exists = self._update_rpy_script(rpy_path, lang_code, renpy_font_path, is_rtl)
 
             if already_exists:
@@ -175,18 +216,6 @@ class FontInjector:
                 "ui_args": {"error": str(e)}
             }
 
-    # Popular Google Fonts List for Manual Selection
-    POPULAR_FONTS = [
-        "Roboto", "Open Sans", "Lato", "Montserrat", "Oswald", "Source Sans Pro", 
-        "Slabo 27px", "Raleway", "PT Sans", "Merriweather", "Noto Sans", "Noto Serif",
-        "Nunito", "Playfair Display", "Rubik", "Ubuntu", "Poppins", "Kanit", "Inter",
-        "Quicksand", "Work Sans", "Fira Sans", "Barlow", "Mulish", "Inconsolata",
-        "IBM Plex Sans", "Titillium Web", "DM Sans", "Oxygen", "Arimo", "Assistant",
-        "Josefin Sans", "Libre Baskerville", "Anton", "Cairo", "Hind", "Bitter",
-        "Vazirmatn", "Noto Sans Arabic", "Noto Sans JP", "Noto Sans SC", "Noto Sans KR",
-        "Amiri", "Tajawal", "Almarai", "Harmattan", "Lalezar"
-    ]
-
     def get_available_fonts(self) -> List[str]:
         """Returns list of popular fonts sorted alphabetically."""
         return sorted(self.POPULAR_FONTS)
@@ -198,8 +227,8 @@ class FontInjector:
         # Font adını ID'ye çevir (Open Sans -> open-sans)
         font_id = font_family.lower().strip().replace(' ', '-')
         
-        # Geniş dil desteği için subsetleri ekle
-        subsets = "latin,latin-ext,cyrillic,cyrillic-ext,greek,greek-ext,vietnamese"
+        # Select appropriate subsets based on font family
+        subsets = self._get_font_subsets(font_id)
         
         # API URL (Google Webfonts Helper)
         download_url = f"https://gwfh.mranftl.com/api/fonts/{font_id}?download=zip&subsets={subsets}&variants=regular,400,500,700"
@@ -421,38 +450,16 @@ translate {lang_code} python:
         # Dosyayı SIFIRDAN oluştur (Eski hatalı kodları temizle)
         with open(rpy_path, 'w', encoding='utf-8') as f:
             f.write(new_block)
-            
+        
+        # Verify the file was created successfully
+        if not rpy_path.exists():
+            self.logger.error(f"Font script file was not created: {rpy_path}")
+            raise OSError(f"Failed to create font script: {rpy_path}")
+        
+        file_size = rpy_path.stat().st_size
+        if file_size < 100:
+            self.logger.error(f"Font script file is too small ({file_size} bytes): {rpy_path}")
+            raise OSError(f"Font script file is incomplete: {rpy_path}")
+        
+        self.logger.info(f"Font script created successfully: {rpy_path} ({file_size} bytes)")
         return False
-
-    def get_available_fonts(self) -> List[str]:
-        """Returns a list of popular Google Fonts for manual selection."""
-        # Expanded list covering various styles (Sans, Serif, Display, Handwriting, Mono)
-        fonts = [
-            # Sans Serif (Clean, Modern, Readable)
-            "Roboto", "Open Sans", "Lato", "Montserrat", "Source Sans Pro", "Oswald", 
-            "Raleway", "Noto Sans", "Nunito", "Poppins", "Ubuntu", "Quicksand", 
-            "Work Sans", "Fira Sans", "Barlow", "Josefin Sans", "Rubik", "Mukta",
-            "Kanit", "Heebo", "Libre Franklin", "Cabin", "Karla", "Varela Round",
-            "Comfortaa", "Exo 2", "Hind", "Maven Pro", "Assistant", "Oxygen",
-            
-            # Serif (Classic, Elegant, Book-like)
-            "Merriweather", "Playfair Display", "Lora", "PT Serif", "Noto Serif",
-            "Libre Baskerville", "Arvo", "Bitter", "Crimson Text", "Josefin Slab",
-            "Slabo 27px", "Old Standard TT", "Volkhov", "EB Garamond",
-            
-            # Display / Decorative (Titles, Stylized, Impactful)
-            "Bebas Neue", "Anton", "Fjalla One", "Acme", "Righteous", "Lobster",
-            "Patua One", "Fredoka One", "Russo One", "Luckiest Guy", "Titan One",
-            "Bangers", "Press Start 2P", "Cinzel", "Abril Fatface", "Alfa Slab One",
-            "Passion One", "Francois One", "Changa",
-            
-            # Handwriting / Script (Casual, Artistic, Diary-like)
-            "Pacifico", "Shadows Into Light", "Dancing Script", "Indie Flower",
-            "Caveat", "Amatic SC", "Courgette", "Patrick Hand", "Satisfy", "Permanent Marker",
-            "Sacramento", "Cookie", "Great Vibes", "Kalam", "Handlee",
-            
-            # Monospace (Scifi, Terminal, Code)
-            "Inconsolata", "Roboto Mono", "Source Code Pro", "Space Mono", "VT323",
-            "Share Tech Mono", "Cousine", "Anonymous Pro"
-        ]
-        return sorted(list(set(fonts)))
